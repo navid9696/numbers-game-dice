@@ -20,8 +20,10 @@ const Page = () => {
 		toggleExclude,
 		addQuestion,
 		removeQuestion,
-		claimedBy, 
-		playerId, 
+		claimedBy,
+		playerId,
+		playerName, 
+		setPlayerName, 
 	} = useRealtimeGame()
 
 	return (
@@ -37,8 +39,8 @@ const Page = () => {
 					roomCode={roomCode}
 					setRoomCode={setRoomCode}
 					addQuestion={addQuestion}
-					playerName={''} 
-					setPlayerName={() => {}} 
+					playerName={playerName}
+					setPlayerName={setPlayerName}
 				/>
 			</Box>
 
@@ -52,6 +54,7 @@ const Page = () => {
 					customQuestions={customQuestions}
 					claimedBy={claimedBy}
 					playerId={playerId}
+					playerName={playerName} 
 				/>
 			</Paper>
 		</Container>

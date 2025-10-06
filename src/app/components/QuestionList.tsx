@@ -1,9 +1,8 @@
 'use client'
 
-import { forwardRef, Fragment } from 'react'
-import { List, ListItem, ListItemText, Checkbox, IconButton, ListSubheader } from '@mui/material'
-import DeleteIcon from '@mui/icons-material/Delete'
-import { questions } from '../data/questions'
+import { forwardRef } from 'react'
+import { List, ListItem, ListItemText, Checkbox, Typography } from '@mui/material'
+import { questions, QuestionCategory } from '../data/questions'
 
 type QuestionListProps = {
 	value: number | null
@@ -14,90 +13,57 @@ type QuestionListProps = {
 	removeQuestion?: (index: number) => void
 	claimedBy: Record<number, string[]>
 	playerId: string
+	playerName: string 
 }
 
 export const QuestionList = forwardRef<HTMLUListElement, QuestionListProps>(
-	({ value, itemRefs, excluded, toggleExclude, customQuestions = [], removeQuestion, claimedBy, playerId }, ref) => {
-		const baseLen = questions.flatMap(c => c.items).length
-
-	
-		let offset = 0
-		const groups: Array<{ title: string; items: Array<{ idx: number; text: string; isCustom: boolean }> }> = [
-			...questions.map(cat => {
-				const start = offset
-				const items = cat.items.map((text, i) => ({
-					idx: start + i + 1,
-					text,
-					isCustom: false,
-				}))
-				offset += cat.items.length
-				return { title: cat.category, items }
-			}),
-			{
-				title: 'Custom Questions',
-				items: customQuestions.map((text, i) => ({
-					idx: baseLen + i + 1,
-					text,
-					isCustom: true,
-				})),
-			},
-		]
+	({ value, itemRefs, excluded, toggleExclude, customQuestions = [], claimedBy, playerId, playerName }, ref) => {
+		let counter = 0
+		const allCategories: QuestionCategory[] = [...questions, { category: 'Custom Questions', items: customQuestions }]
 
 		return (
 			<List ref={ref}>
-				{groups.map(g => (
-					<Fragment key={`grp-${g.title}`}>
-						<ListSubheader disableSticky className='!bg-transparent !text-gray-400 !font-bold'>
-							{g.title}
-						</ListSubheader>
+				{allCategories.map((cat, ci) => (
+					<div key={ci}>
+						<Typography variant='subtitle2' className='text-gray-400 font-bold mt-2 mb-1'>
+							{cat.category}
+						</Typography>
 
-						{g.items.map(({ idx, text, isCustom }) => {
+						{cat.items.map((q, i) => {
+							counter++
+							const idx = counter
 							const isSelected = value === idx
-							const isExcluded = excluded.has(idx)
-							const players = claimedBy[idx] || []
-							const taken = players.length > 0
-							const isMine = players.includes(playerId)
+							const isExcluded = excluded.has(idx) 
+							const takers = claimedBy[idx] || [] 
+							const taken = takers.length > 0
+							const isMine = takers.includes(playerName) 
 
 							return (
 								<ListItem
-									key={`item-${idx}`}
+									key={`${ci}-${i}`}
 									ref={el => {
 										itemRefs.current[idx - 1] = el
 									}}
 									className={`flex items-center gap-2 rounded-md group ${
 										isSelected ? 'bg-blue-500/20 text-blue-400' : ''
 									}`}
-									sx={{ py: 0 }}
-									secondaryAction={
-										<div className='flex items-center gap-2'>
-											{taken && <span className='text-xs opacity-80'>{players.length} taken</span>}
-											{isCustom && removeQuestion && (
-												<IconButton
-													edge='end'
-													aria-label='delete'
-													onClick={() => removeQuestion(idx - 1)}
-													className='opacity-0 group-hover:opacity-100 transition'>
-													<DeleteIcon className='text-red-400 hover:text-red-600' />
-												</IconButton>
-											)}
-										</div>
-									}>
+									sx={{ py: 0 }}>
 									<Checkbox
 										edge='start'
 										checked={isExcluded}
-										onChange={() => toggleExclude(idx)} 
+										onChange={() => toggleExclude(idx)}
 										sx={{ p: 0, mr: 1 }}
 									/>
 									<ListItemText
-										primary={`${idx}. ${text}`}
-										secondary={taken ? 'taken' : undefined}
+										primary={`${idx}. ${q}`}
+										secondary={taken ? `Taken by: ${takers.join(', ')}` : undefined}
 										slotProps={{
 											primary: {
 												className: `
-        text-sm
-        ${isExcluded ? 'line-through text-gray-600' : 'text-gray-300'} 
-        ${isSelected ? 'font-bold' : ''}
-      `,
+                          text-sm
+                          ${isMine ? 'line-through text-gray-600' : 'text-gray-300'}
+                          ${isSelected ? 'font-bold' : ''}
+                        `,
 											},
 											secondary: { className: 'text-xs text-yellow-400' },
 										}}
@@ -105,7 +71,7 @@ export const QuestionList = forwardRef<HTMLUListElement, QuestionListProps>(
 								</ListItem>
 							)
 						})}
-					</Fragment>
+					</div>
 				))}
 			</List>
 		)
