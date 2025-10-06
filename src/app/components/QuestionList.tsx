@@ -7,7 +7,7 @@ import { questions, QuestionCategory } from '../data/questions'
 
 type QuestionListProps = {
 	value: number | null
-	itemRefs: React.MutableRefObject<(HTMLLIElement | null)[]>
+	itemRefs: React.RefObject<(HTMLLIElement | null)[]>
 	excluded: Set<number>
 	excludedBy: Record<number, string[]>
 	toggleExclude: (index: number) => void
@@ -19,21 +19,7 @@ type QuestionListProps = {
 }
 
 export const QuestionList = forwardRef<HTMLUListElement, QuestionListProps>(
-	(
-		{
-			value,
-			itemRefs,
-			excluded,
-			excludedBy,
-			toggleExclude,
-			customQuestions = [],
-			removeQuestion,
-			claimedBy,
-			playerId: _playerId,
-			playerName,
-		},
-		ref
-	) => {
+	({ value, itemRefs, excluded, excludedBy, toggleExclude, customQuestions = [], removeQuestion, claimedBy }, ref) => {
 		let counter = 0
 		const allCategories: QuestionCategory[] = [...questions, { category: 'Custom Questions', items: customQuestions }]
 

@@ -7,10 +7,10 @@ import { getCustomKey, getExcludedKey } from '~/lib/storage'
 
 const randInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
 const getClaimedKey = (room: string) => `claimedBy:${room}`
-const getPlayerNameKey = (room: string) => `playerName:${room}`
 const getExcludedByKey = (room: string) => `excludedBy:${room}`
 const getNamesByIdKey = (room: string) => `namesById:${room}`
 const getClientIdKey = (room: string) => `clientId:${room}`
+const getPlayerNameClientKey = (room: string, id: string) => `playerName:${room}:${id}`
 
 const isEditableTarget = (el: Element | null) => {
 	if (!el) return false
@@ -73,10 +73,11 @@ export const useRealtimeGame = () => {
 
 	const updatePlayerName = useCallback(
 		(n: string) => {
-			if (!clientId.current) return
+			if (!clientId.current || !roomCode) return
 			setPlayerNameState(n)
 			setNamesById(m => ({ ...m, [clientId.current]: n }))
-			localStorage.setItem(getPlayerNameKey(roomCode), n)
+			const key = getPlayerNameClientKey(roomCode, clientId.current)
+			sessionStorage.setItem(key, n)
 			setTimeout(() => emit('set_name', { id: clientId.current, name: n }), 0)
 		},
 		[emit, roomCode]
@@ -194,28 +195,28 @@ export const useRealtimeGame = () => {
 
 	useEffect(() => {
 		if (!roomCode) return
-		let id = localStorage.getItem(getClientIdKey(roomCode))
+		let id = sessionStorage.getItem(getClientIdKey(roomCode))
 		if (!id) {
 			id = crypto.randomUUID()
-			localStorage.setItem(getClientIdKey(roomCode), id)
+			sessionStorage.setItem(getClientIdKey(roomCode), id)
 		}
 		clientId.current = id
 
-		const savedName = localStorage.getItem(getPlayerNameKey(roomCode)) || ''
-		setPlayerNameState(savedName)
-
 		const savedNamesById = localStorage.getItem(getNamesByIdKey(roomCode))
-		setNamesById(
-			savedNamesById
-				? (() => {
-						try {
-							return JSON.parse(savedNamesById) as Record<string, string>
-						} catch {
-							return {}
-						}
-				  })()
-				: {}
-		)
+		const baseMap = savedNamesById
+			? (() => {
+					try {
+						return JSON.parse(savedNamesById) as Record<string, string>
+					} catch {
+						return {}
+					}
+			  })()
+			: {}
+
+		const savedName = sessionStorage.getItem(getPlayerNameClientKey(roomCode, id)) || ''
+		if (savedName) baseMap[id] = savedName
+		setNamesById(baseMap)
+		setPlayerNameState(savedName)
 
 		const savedCustom = localStorage.getItem(getCustomKey(roomCode))
 		setCustomQuestions(
@@ -273,9 +274,6 @@ export const useRealtimeGame = () => {
 		joinRoom(roomCode)
 	}, [roomCode, joinRoom])
 
-	useEffect(() => {
-		if (roomCode) localStorage.setItem(getPlayerNameKey(roomCode), playerName)
-	}, [roomCode, playerName])
 	useEffect(() => {
 		if (roomCode) localStorage.setItem(getNamesByIdKey(roomCode), JSON.stringify(namesById))
 	}, [roomCode, namesById])
