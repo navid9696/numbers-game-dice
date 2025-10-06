@@ -11,6 +11,7 @@ const Page = () => {
 		value,
 		rolling,
 		excluded,
+		excludedBy,
 		customQuestions,
 		roomCode,
 		setRoomCode,
@@ -22,8 +23,9 @@ const Page = () => {
 		removeQuestion,
 		claimedBy,
 		playerId,
-		playerName, 
-		setPlayerName, 
+		playerName,
+		setPlayerName,
+		resetGame,
 	} = useRealtimeGame()
 
 	return (
@@ -32,7 +34,8 @@ const Page = () => {
 				<Typography variant='h4' fontWeight='bold'>
 					Number Dice 1–{max}
 				</Typography>
-				<DiceCard value={value} rolling={rolling} />
+				<DiceCard value={value} rolling={rolling} max={max} />
+
 				<Controls
 					rolling={rolling}
 					roll={roll}
@@ -41,6 +44,7 @@ const Page = () => {
 					addQuestion={addQuestion}
 					playerName={playerName}
 					setPlayerName={setPlayerName}
+					resetGame={resetGame}
 				/>
 			</Box>
 
@@ -49,12 +53,13 @@ const Page = () => {
 					value={value}
 					itemRefs={itemRefs}
 					excluded={excluded}
+					excludedBy={excludedBy}
 					toggleExclude={toggleExclude}
-					removeQuestion={removeQuestion}
 					customQuestions={customQuestions}
+					removeQuestion={removeQuestion}
 					claimedBy={claimedBy}
 					playerId={playerId}
-					playerName={playerName} 
+					playerName={playerName}
 				/>
 			</Paper>
 		</Container>

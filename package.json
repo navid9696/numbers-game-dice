@@ -13,10 +13,12 @@
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.4",
     "@mui/material": "^7.3.4",
+    "@react-spring/web": "^10.0.3",
     "@supabase/supabase-js": "^2.58.0",
     "next": "15.5.4",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "react-flip-numbers": "^3.0.9"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

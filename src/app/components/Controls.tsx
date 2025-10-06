@@ -1,6 +1,7 @@
 'use client'
 
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState, useCallback } from 'react'
+import { Stack, Button, TextField, Typography } from '@mui/material'
 
 type ControlsProps = {
 	rolling: boolean
@@ -10,6 +11,7 @@ type ControlsProps = {
 	addQuestion: (q: string) => void
 	playerName: string
 	setPlayerName: (n: string) => void
+	resetGame: () => void
 }
 
 const ControlsComponent = ({
@@ -20,6 +22,7 @@ const ControlsComponent = ({
 	addQuestion,
 	playerName,
 	setPlayerName,
+	resetGame,
 }: ControlsProps) => {
 	const [newQuestion, setNewQuestion] = useState('')
 	const [roomDraft, setRoomDraft] = useState(roomCode)
@@ -28,73 +31,99 @@ const ControlsComponent = ({
 	useEffect(() => {
 		setRoomDraft(roomCode)
 	}, [roomCode])
+
 	useEffect(() => {
 		setNameDraft(playerName)
 	}, [playerName])
 
 	const canAdd = useMemo(() => newQuestion.trim().length > 0, [newQuestion])
 
-	const handleAdd = () => {
+	const handleAdd = useCallback(() => {
 		if (!canAdd) return
 		addQuestion(newQuestion.trim())
 		setNewQuestion('')
-	}
+	}, [canAdd, addQuestion, newQuestion])
+
+	const stopHotkeys = useCallback((e: React.KeyboardEvent<Element>) => {
+		const k = e.key
+		if (k === ' ' || k === 'Spacebar' || k === 'r' || k === 'R' || k === 'Enter') {
+			e.stopPropagation()
+			if (k === ' ') e.preventDefault()
+		}
+	}, [])
 
 	return (
-		<div className='flex flex-col items-center gap-3 w-full md:w-auto'>
-			<button
+		<Stack spacing={2} alignItems='center' sx={{ width: '100%', maxWidth: 560 }}>
+			<Button
+				type='button'
 				onClick={roll}
 				disabled={rolling}
-				className='rounded-xl px-6 py-3 bg-blue-600 text-white disabled:opacity-60'>
+				variant='contained'
+				color='primary'
+				sx={{ px: 4, py: 1.25, borderRadius: 2 }}>
 				{rolling ? 'Rolling…' : 'Roll'}
-			</button>
+			</Button>
 
-			<p className='text-sm text-gray-400'>Press Space or R to roll</p>
+			<Typography variant='body2' color='text.secondary'>
+				Press Space or R to roll
+			</Typography>
 
-			<div className='flex items-center gap-2 w-full'>
-				<input
-					className='w-full rounded px-3 py-2 bg-white text-black'
-					placeholder='Room code'
-					value={roomDraft}
-					onChange={e => setRoomDraft(e.target.value)}
-					onBlur={() => setRoomCode(roomDraft.trim())}
-					onKeyDown={e => {
-						if (e.key === 'Enter') setRoomCode(roomDraft.trim())
-					}}
-				/>
-			</div>
+			<TextField
+				fullWidth
+				label='Room code'
+				value={roomDraft}
+				onChange={e => setRoomDraft(e.target.value)}
+				onBlur={() => setRoomCode(roomDraft.trim())}
+				onKeyDown={e => {
+					stopHotkeys(e)
+					if (e.key === 'Enter') setRoomCode(roomDraft.trim())
+				}}
+				onKeyUp={stopHotkeys}
+				size='medium'
+			/>
 
-			<div className='flex items-center gap-2 w-full'>
-				<input
-					className='w-full rounded px-3 py-2 bg-white text-black'
-					placeholder='Your name'
-					value={nameDraft}
-					onChange={e => setNameDraft(e.target.value)}
-					onBlur={() => setPlayerName(nameDraft)}
-					onKeyDown={e => {
-						if (e.key === 'Enter') setPlayerName(nameDraft)
-					}}
-				/>
-			</div>
+			<TextField
+				fullWidth
+				label='Your name'
+				value={nameDraft}
+				onChange={e => setNameDraft(e.target.value)}
+				onBlur={() => setPlayerName(nameDraft)}
+				onKeyDown={e => {
+					stopHotkeys(e)
+					if (e.key === 'Enter') setPlayerName(nameDraft)
+				}}
+				onKeyUp={stopHotkeys}
+				size='medium'
+			/>
 
-			<div className='flex items-center gap-2 w-full'>
-				<input
-					className='w-full rounded px-3 py-2 bg-white text-black'
-					placeholder='Add new question...'
+			<Stack direction='row' spacing={1} sx={{ width: '100%' }}>
+				<TextField
+					fullWidth
+					label='Add new question...'
 					value={newQuestion}
 					onChange={e => setNewQuestion(e.target.value)}
 					onKeyDown={e => {
+						stopHotkeys(e)
 						if (e.key === 'Enter') handleAdd()
 					}}
+					onKeyUp={stopHotkeys}
+					size='medium'
 				/>
-				<button
+				<Button
+					type='button'
 					onClick={handleAdd}
 					disabled={!canAdd}
-					className='rounded-xl px-3 py-2 bg-blue-600 text-white disabled:opacity-60'>
+					variant='contained'
+					color='primary'
+					sx={{ px: 2.5, borderRadius: 2 }}>
 					+
-				</button>
-			</div>
-		</div>
+				</Button>
+			</Stack>
+
+			<Button onClick={resetGame} variant='contained' color='error' sx={{ px: 4, py: 1.25, borderRadius: 2 }}>
+				Reset Game
+			</Button>
+		</Stack>
 	)
 }
 

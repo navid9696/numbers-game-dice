@@ -5,30 +5,43 @@ import { supabase } from '~/lib/supabase'
 import { questions, QuestionCategory } from '~/app/data/questions'
 import { getCustomKey, getExcludedKey } from '~/lib/storage'
 
-/** helpers */
 const randInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
 const getClaimedKey = (room: string) => `claimedBy:${room}`
 const getPlayerNameKey = (room: string) => `playerName:${room}`
+const getExcludedByKey = (room: string) => `excludedBy:${room}`
+const getNamesByIdKey = (room: string) => `namesById:${room}`
+const getClientIdKey = (room: string) => `clientId:${room}`
+
+const isEditableTarget = (el: Element | null) => {
+	if (!el) return false
+	const tag = el.tagName
+	if (tag === 'INPUT' || tag === 'TEXTAREA') return true
+	const ce = (el as HTMLElement).getAttribute('contenteditable')
+	return ce === '' || ce === 'true'
+}
 
 export const useRealtimeGame = () => {
 	const [value, setValue] = useState<number | null>(null)
 	const [rolling, setRolling] = useState(false)
 	const [excluded, setExcluded] = useState<Set<number>>(new Set())
+	const [excludedBy, setExcludedBy] = useState<Record<number, string[]>>({})
 	const [customQuestions, setCustomQuestions] = useState<string[]>([])
 	const [roomCode, setRoomCode] = useState('')
-	const [playerName, setPlayerName] = useState('') // ⬅️ imię gracza
-
-	const itemRefs = useRef<(HTMLLIElement | null)[]>([])
-	const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
-
-	/** kto wziął dany numer – trzymamy IMIONA */
+	const [playerName, setPlayerNameState] = useState('')
+	const [namesById, setNamesById] = useState<Record<string, string>>({})
 	const [claimedBy, setClaimedBy] = useState<Record<number, string[]>>({})
-	const clientId = useRef<string>(crypto.randomUUID())
 
-	// Refs do synchronizacji
+	const clientId = useRef<string>('')
+	const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+	const itemRefs = useRef<(HTMLLIElement | null)[]>([])
+
 	const valueRef = useRef<number | null>(null)
 	const customRef = useRef<string[]>([])
 	const claimedByRef = useRef<Record<number, string[]>>({})
+	const excludedByRef = useRef<Record<number, string[]>>({})
+	const namesByIdRef = useRef<Record<string, string>>({})
+	const playerNameRef = useRef('')
+
 	useEffect(() => {
 		valueRef.current = value
 	}, [value])
@@ -38,20 +51,37 @@ export const useRealtimeGame = () => {
 	useEffect(() => {
 		claimedByRef.current = claimedBy
 	}, [claimedBy])
+	useEffect(() => {
+		excludedByRef.current = excludedBy
+	}, [excludedBy])
+	useEffect(() => {
+		namesByIdRef.current = namesById
+	}, [namesById])
+	useEffect(() => {
+		playerNameRef.current = playerName
+	}, [playerName])
 
-	/** dane */
 	const flattenQuestions = (categories: QuestionCategory[], custom: string[]) =>
 		categories.flatMap(c => c.items).concat(custom)
 	const allQuestions = useMemo(() => flattenQuestions(questions, customQuestions), [customQuestions])
 	const max = allQuestions.length
 
-	/** emit */
 	const emit = useCallback((event: string, payload: Record<string, unknown>) => {
 		if (!channelRef.current) return
 		channelRef.current.send({ type: 'broadcast', event, payload })
 	}, [])
 
-	/** join */
+	const updatePlayerName = useCallback(
+		(n: string) => {
+			if (!clientId.current) return
+			setPlayerNameState(n)
+			setNamesById(m => ({ ...m, [clientId.current]: n }))
+			localStorage.setItem(getPlayerNameKey(roomCode), n)
+			setTimeout(() => emit('set_name', { id: clientId.current, name: n }), 0)
+		},
+		[emit, roomCode]
+	)
+
 	const joinRoom = useCallback((room: string) => {
 		if (!room) return
 		if (channelRef.current) {
@@ -59,6 +89,11 @@ export const useRealtimeGame = () => {
 			channelRef.current = null
 		}
 		const ch = supabase.channel(`number-game:${room}`, { config: { broadcast: { self: false } } })
+
+		ch.on('broadcast', { event: 'set_name' }, payload => {
+			const { id, name } = payload.payload as { id: string; name: string }
+			setNamesById(m => ({ ...m, [id]: name }))
+		})
 
 		ch.on('broadcast', { event: 'roll' }, payload => {
 			const { v, name } = payload.payload as { v: number; name: string }
@@ -83,18 +118,38 @@ export const useRealtimeGame = () => {
 			setCustomQuestions(prev => prev.filter((_, i) => i !== ci))
 		})
 
+		ch.on('broadcast', { event: 'toggle_exclude' }, payload => {
+			const { index, isExcluded, name } = payload.payload as { index: number; isExcluded: boolean; name: string }
+			if (isExcluded) {
+				setExcludedBy(m => {
+					const set = new Set([...(m[index] || []), name])
+					return { ...m, [index]: [...set] }
+				})
+			} else {
+				setExcludedBy(m => {
+					const list = new Set(m[index] || [])
+					list.delete(name)
+					const n = { ...m }
+					const arr = [...list]
+					if (arr.length) n[index] = arr
+					else delete n[index]
+					return n
+				})
+			}
+		})
+
 		ch.on('broadcast', { event: 'sync_state' }, payload => {
 			const { state } = payload.payload as {
 				state: {
 					value: number | null
 					customQuestions: string[]
 					claimedBy?: Record<number, string[]>
+					excludedBy?: Record<number, string[]>
+					namesById?: Record<string, string>
 				}
 			}
 			setCustomQuestions(state.customQuestions || [])
 			setValue(state.value ?? null)
-
-			// MERGE claimedBy (nie nadpisuj lokalnych)
 			setClaimedBy(prev => {
 				const merged: Record<number, string[]> = { ...prev }
 				const incoming = state.claimedBy || {}
@@ -105,7 +160,8 @@ export const useRealtimeGame = () => {
 				}
 				return merged
 			})
-			// excluded pozostaje lokalne – nic nie robimy
+			setExcludedBy(state.excludedBy || {})
+			setNamesById(prev => ({ ...prev, ...(state.namesById || {}) }))
 		})
 
 		ch.subscribe(status => {
@@ -118,26 +174,49 @@ export const useRealtimeGame = () => {
 							value: valueRef.current,
 							customQuestions: customRef.current,
 							claimedBy: claimedByRef.current,
+							excludedBy: excludedByRef.current,
+							namesById: namesByIdRef.current,
 						},
 					},
 				})
+				const n = playerNameRef.current
+				if (n) ch.send({ type: 'broadcast', event: 'set_name', payload: { id: clientId.current, name: n } })
 			}
 		})
 
 		channelRef.current = ch
 	}, [])
 
-	/** start: room z localStorage */
 	useEffect(() => {
 		const savedRoom = localStorage.getItem('roomCode') || ''
 		if (savedRoom) setRoomCode(savedRoom)
 	}, [])
 
-	/** na zmianę room: wczytaj wszystko per room */
 	useEffect(() => {
 		if (!roomCode) return
+		let id = localStorage.getItem(getClientIdKey(roomCode))
+		if (!id) {
+			id = crypto.randomUUID()
+			localStorage.setItem(getClientIdKey(roomCode), id)
+		}
+		clientId.current = id
 
-		// custom
+		const savedName = localStorage.getItem(getPlayerNameKey(roomCode)) || ''
+		setPlayerNameState(savedName)
+
+		const savedNamesById = localStorage.getItem(getNamesByIdKey(roomCode))
+		setNamesById(
+			savedNamesById
+				? (() => {
+						try {
+							return JSON.parse(savedNamesById) as Record<string, string>
+						} catch {
+							return {}
+						}
+				  })()
+				: {}
+		)
+
 		const savedCustom = localStorage.getItem(getCustomKey(roomCode))
 		setCustomQuestions(
 			savedCustom
@@ -151,7 +230,6 @@ export const useRealtimeGame = () => {
 				: []
 		)
 
-		// excluded (lokalne)
 		const savedExcluded = localStorage.getItem(getExcludedKey(roomCode))
 		setExcluded(
 			savedExcluded
@@ -165,7 +243,19 @@ export const useRealtimeGame = () => {
 				: new Set<number>()
 		)
 
-		// claimed
+		const savedExcludedBy = localStorage.getItem(getExcludedByKey(roomCode))
+		setExcludedBy(
+			savedExcludedBy
+				? (() => {
+						try {
+							return JSON.parse(savedExcludedBy) as Record<number, string[]>
+						} catch {
+							return {}
+						}
+				  })()
+				: {}
+		)
+
 		const savedClaimed = localStorage.getItem(getClaimedKey(roomCode))
 		setClaimedBy(
 			savedClaimed
@@ -179,45 +269,43 @@ export const useRealtimeGame = () => {
 				: {}
 		)
 
-		// player name for this room
-		const savedName = localStorage.getItem(getPlayerNameKey(roomCode)) || ''
-		setPlayerName(savedName)
-
 		localStorage.setItem('roomCode', roomCode)
 		joinRoom(roomCode)
 	}, [roomCode, joinRoom])
 
-	/** persystencja */
+	useEffect(() => {
+		if (roomCode) localStorage.setItem(getPlayerNameKey(roomCode), playerName)
+	}, [roomCode, playerName])
+	useEffect(() => {
+		if (roomCode) localStorage.setItem(getNamesByIdKey(roomCode), JSON.stringify(namesById))
+	}, [roomCode, namesById])
 	useEffect(() => {
 		if (roomCode) localStorage.setItem(getCustomKey(roomCode), JSON.stringify(customQuestions))
 	}, [roomCode, customQuestions])
-
 	useEffect(() => {
 		if (roomCode) localStorage.setItem(getExcludedKey(roomCode), JSON.stringify([...excluded]))
 	}, [roomCode, excluded])
-
+	useEffect(() => {
+		if (roomCode) localStorage.setItem(getExcludedByKey(roomCode), JSON.stringify(excludedBy))
+	}, [roomCode, excludedBy])
 	useEffect(() => {
 		if (roomCode) localStorage.setItem(getClaimedKey(roomCode), JSON.stringify(claimedBy))
 	}, [roomCode, claimedBy])
 
+	const didInitAutoScroll = useRef(false)
 	useEffect(() => {
-		if (roomCode) localStorage.setItem(getPlayerNameKey(roomCode), playerName)
-	}, [roomCode, playerName])
-
-	/** pierwszy auto-scroll */
-	useEffect(() => {
+		if (didInitAutoScroll.current) return
 		if (max === 0) return
+		didInitAutoScroll.current = true
 		const v = randInt(1, max)
 		setValue(v)
 		setTimeout(() => itemRefs.current[v - 1]?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60)
 	}, [max])
 
-	/** roll */
 	const roll = useCallback(() => {
 		if (rolling) return
 		const available = allQuestions.map((_, i) => i + 1).filter(n => !excluded.has(n))
 		if (available.length === 0) return
-
 		setRolling(true)
 		let ticks = 22
 		const timer = setInterval(() => {
@@ -228,41 +316,54 @@ export const useRealtimeGame = () => {
 				const v = available[randInt(0, available.length - 1)]
 				setValue(v)
 				setRolling(false)
-
-				// u mnie: wyklucz (skreślenie)
 				setExcluded(prev => new Set([...prev, v]))
-
-				// u wszystkich: taken przez MOJE IMIĘ
-				const myName = playerName || 'Player'
+				const myName = playerNameRef.current || 'Player'
 				setClaimedBy(prev => {
 					const set = new Set([...(prev[v] || []), myName])
 					return { ...prev, [v]: [...set] }
 				})
-
 				setTimeout(() => itemRefs.current[v - 1]?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60)
-
 				emit('roll', { v, name: myName })
 			}
 		}, 70)
-	}, [rolling, allQuestions, excluded, emit, playerName]) // ⬅️ playerName w deps
+	}, [rolling, allQuestions, excluded, emit])
 
-	/** skróty */
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (e.code === 'Space' || e.key.toLowerCase() === 'r') roll()
+			if (isEditableTarget(document.activeElement)) return
+			const k = e.key.toLowerCase()
+			if (e.code === 'Space' || k === 'r') roll()
 		}
 		window.addEventListener('keydown', onKey)
 		return () => window.removeEventListener('keydown', onKey)
 	}, [roll])
 
-	/** UI helpers */
 	const toggleExclude = (index: number) => {
-		setExcluded(prev => {
-			const copy = new Set(prev)
-			copy.has(index) ? copy.delete(index) : copy.add(index)
-			return copy
-		})
-		// exclude jest lokalne – nie broadcastujemy
+		const me = playerNameRef.current || 'Player'
+		if (excluded.has(index)) {
+			setExcluded(s => {
+				const n = new Set(s)
+				n.delete(index)
+				return n
+			})
+			setExcludedBy(m => {
+				const list = new Set(m[index] || [])
+				list.delete(me)
+				const n = { ...m }
+				const arr = [...list]
+				if (arr.length) n[index] = arr
+				else delete n[index]
+				return n
+			})
+			emit('toggle_exclude', { index, isExcluded: false, name: me })
+		} else {
+			setExcluded(s => new Set([...s, index]))
+			setExcludedBy(m => {
+				const set = new Set([...(m[index] || []), me])
+				return { ...m, [index]: [...set] }
+			})
+			emit('toggle_exclude', { index, isExcluded: true, name: me })
+		}
 	}
 
 	const addQuestion = (text: string) => {
@@ -279,10 +380,18 @@ export const useRealtimeGame = () => {
 		emit('remove_question', { globalIndex: index })
 	}
 
+	const resetGame = useCallback(() => {
+		setValue(null)
+		setExcluded(new Set())
+		setClaimedBy({})
+		setExcludedBy({})
+	}, [])
+
 	return {
 		value,
 		rolling,
 		excluded,
+		excludedBy,
 		customQuestions,
 		roomCode,
 		setRoomCode,
@@ -292,10 +401,11 @@ export const useRealtimeGame = () => {
 		toggleExclude,
 		addQuestion,
 		removeQuestion,
-
 		claimedBy,
 		playerId: clientId.current,
-		playerName, // ⬅️ eksport
-		setPlayerName, // ⬅️ eksport
+		playerName,
+		setPlayerName: updatePlayerName,
+		namesById,
+		resetGame,
 	}
 }
