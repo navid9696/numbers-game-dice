@@ -1,36 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎲 Numbers Game Dice
 
-## Getting Started
+Multiplayer web application for interactive conversations based on the popular “Number Game”.
 
-First, run the development server:
+2 Players join a shared room, roll a virtual dice, and answer randomly selected questions — with full control over which topics they want to include or skip.
+
+---
+
+## 🚀 Live Demo
+
+👉 https://numbers-game-dice.vercel.app
+
+## 🖼️ Application Overview  
+
+### Game Screen
+<img width="1862" height="1036" alt="image" src="https://github.com/user-attachments/assets/e3029c60-b6f1-46ef-a146-c7663d9b8cc6" />
+
+---
+
+## 🧠 Concept
+
+This project is based on a well-known internet “icebreaker” game where each number corresponds to a question.
+
+Instead of manually choosing numbers, the application:
+
+* generates questions randomly,
+* allows users to filter or exclude specific ones,
+* synchronizes gameplay between two players in real time.
+
+---
+
+## ⚙️ Features
+
+* Real-time multiplayer rooms (2 players)
+* Shared game state between users
+* Random question generator (dice system)
+* Ability to skip or exclude selected questions
+* Custom question input
+* Room-based session system (join via code)
+* Simple and responsive UI
+
+---
+
+## 🔄 How It Works
+
+1. User creates or joins a room using a room code
+2. Second player joins the same room
+3. Players roll the dice to draw a question
+4. Questions can be answered, skipped, or filtered
+5. Game state is synchronized between both players
+
+---
+
+## ⚠️ Content Note
+
+The application includes a wide range of question types, from casual to more personal topics.
+
+Users have full control over the experience:
+
+* questions can be skipped,
+* specific ones can be excluded,
+* custom questions can be added.
+
+---
+
+## 🧱 Tech Stack
+
+Frontend:
+
+* React
+* TypeScript
+
+Backend / Realtime:
+
+* Supabase
+
+---
+
+## 📚 What I Learned
+
+* Implementing real-time communication between users
+* Managing shared state in a multiplayer environment
+* Designing simple interactive game logic
+* Handling user-driven content and filtering
+
+---
+
+## 🛠️ Installation
 
 ```bash
+git clone https://github.com/navid9696/numbers-game-dice
+cd numbers-game-dice
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📌 Project Scope
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This is a lightweight experimental project focused on:
 
-## Learn More
+* real-time interaction,
+* multiplayer synchronization,
+* simple game mechanics.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 👤 Author
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Created as a side project to explore multiplayer logic and interactive UI.
