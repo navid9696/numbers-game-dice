@@ -85,7 +85,7 @@ export const questions: QuestionCategory[] = [
 		],
 	},
 	{
-		category: 'Appearance/Looks (Extra 56–65)',
+		category: 'Appearance/Looks',
 		items: [
 			'Skin Tone',
 			'Skin Type',
